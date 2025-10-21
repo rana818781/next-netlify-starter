@@ -1,0 +1,40 @@
+import { google } from 'googleapis';
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed. Use POST.' });
+  }
+
+  try {
+    const { prompt } = req.body;
+    if (!prompt) return res.status(400).json({ error: 'Prompt is required.' });
+
+    const serviceAccount = JSON.parse(process.env.SERVICE_ACCOUNT_JSON);
+
+    const auth = new google.auth.GoogleAuth({
+      credentials: serviceAccount,
+      scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+    });
+
+    const client = await auth.getClient();
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta2/images:generate`;
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${await client.getAccessToken()}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gemini-image-alpha-1',
+        prompt: prompt
+      }),
+    });
+
+    const data = await response.json();
+    const imageUrl = data?.data?.[0]?.url || null;
+
+    if (!imageUrl) return res.status(500).json({ error: 'Failed to generate image.' });
+
+    res.status(200).json({ image: imageUrl });
+  } catch
